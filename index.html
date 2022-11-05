@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo</title>
+    <style type="text/css">
+      body {
+        margin: 0;
+      }
+      canvas {
+        background-color: #b6e9f8;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="750" height="610" />
+    <script>
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      /**
+       * Abstract Class Character.
+       *
+       * @class Character
+       */
+      class Character {
+        ctx = null;
+        posX = 0;
+        posY = 0;
+        speed = 5;
+        moveY = 0;
+        moveX = 0;
+        firing = false;
+        width = 10;
+        height = 10;
+        limitX = 0;
+        limitY = 0;
+        height = 30;
+        width = 30;
+        name = "unknow";
+        life = 10;
+        level = 1;
+
+        constructor(ctx, name) {
+          this.ctx = ctx;
+          this.name = name;
+
+          this.limitX = ctx.canvas.width;
+          this.limitY = ctx.canvas.height;
+        }
+
+        movements = {
+          ArrowRight: () => (this.moveX = this.speed * 1),
+          ArrowLeft: () => (this.moveX = this.speed * -1),
+          ArrowUp: () => (this.moveY = this.speed * -1),
+          ArrowDown: () => (this.moveY = this.speed * 1),
+          Space: () => (this.firing = true),
+        };
+
+        stop = {
+          ArrowRight: () => (this.moveX = 0),
+          ArrowLeft: () => (this.moveX = 0),
+          ArrowUp: () => (this.moveY = 0),
+          ArrowDown: () => (this.moveY = 0),
+          Space: () => (this.firing = false),
+        };
+
+        isLeftOut() {
+          return this.posX < 0;
+        }
+
+        isRightOut() {
+          return this.posX > this.limitX;
+        }
+
+        isBottomOut() {
+          return this.posY >= this.limitY;
+        }
+
+        isTopOut() {
+          return this.posY < 0;
+        }
+
+        move() {
+          this.posX += this.moveX;
+          this.posY += this.moveY;
+
+          if (this.isLeftOut()) {
+            this.posX = 0;
+          }
+
+          if (this.isTopOut()) {
+            this.posY = 0;
+          }
+
+          if (this.isRightOut()) {
+            this.posX = this.limitX;
+          }
+
+          if (this.isBottomOut()) {
+            this.posY = this.limitY;
+          }
+          // console.log("posX: ", this.posX, "posY: ", this.posY, "moveX: ", this.moveX, "moveY: ", this.moveY);
+        }
+
+        update() {
+          this.run();
+          this.move();
+          this.draw(this.ctx);
+        }
+
+        isOut() {
+          return (
+            this.isBottomOut() ||
+            this.isTopOut() ||
+            this.isLeftOut() ||
+            this.isRightOut()
+          );
+        }
+      }
+
+      class Enemy extends Character {
+        constructor(ctx, initialX, initialY) {
+          super(ctx, `enemy-${initialX}`);
+          this.posX = initialX;
+          this.posY = initialY;
+          this.speed = 2;
+        }
+
+        isTopOut() {
+          return false; //this.posY < 0;
+        }
+
+        run() {
+          this.movements["ArrowDown"]();
+        }
+
+        draw() {
+          this.ctx.fillStyle = "lime";
+          this.ctx.fillRect(this.posX, this.posY, this.height, this.width);
+        }
+      }
+
+      class Hero extends Character {
+        constructor(ctx, initialX, initialY) {
+          super(ctx, "hero");
+          this.posX = initialX;
+          this.posY = initialY;
+          this.speed = 5;
+          this.height = 50;
+          this.width = 50;
+        }
+
+        moveStart(code) {
+          try {
+            this.movements[code]();
+          } catch (error) {
+            console.log("command invalid: ", code);
+          }
+        }
+
+        moveStop(code) {
+          try {
+            this.stop[code]();
+          } catch (error) {
+            console.log("command invalid: ", code);
+          }
+        }
+
+        run() {}
+
+        draw() {
+          this.ctx.beginPath();
+          this.ctx.moveTo(this.posX, this.posY + this.height);
+          this.ctx.lineTo(this.posX + this.width, this.posY + this.height);
+          this.ctx.lineTo(this.posX + Math.abs(this.width / 2), this.posY);
+          this.ctx.closePath();
+
+          this.ctx.lineWidth = 5;
+          this.ctx.strokeStyle = "white";
+          this.ctx.stroke();
+
+          this.ctx.fillStyle = "gray";
+          this.ctx.fill();
+        }
+      }
+
+      const Scennes = [
+        [
+          [10, 1],
+          [110, -100],
+          [210, -200],
+          [310, -300],
+          [410, -400],
+          [510, -500],
+          [610, -600],
+        ],
+      ];
+
+      class Sky {
+        draw(ctx) {
+          const grd = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+
+          grd.addColorStop(0, "black");
+          grd.addColorStop(1, "blue");
+
+          ctx.fillStyle = grd;
+          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        }
+      }
+
+      class Engine {
+        sky = new Sky();
+        hero = new Hero(
+          ctx,
+          Math.abs(ctx.canvas.width / 2),
+          Math.abs(ctx.canvas.height / 4) * 3
+        );
+        enemy = new Enemy(ctx, 40, 40);
+
+        elements = [];
+        scennes = [];
+
+        constructor(scennes) {
+          this.scennes = scennes;
+          this.elements = [];
+          this.init();
+        }
+
+        createElements(scenne) {
+          scenne.forEach((s) => this.elements.push(new Enemy(ctx, s[0], s[1])));
+        }
+
+        init() {
+          this.scennes.forEach((s) => this.createElements(s));
+        }
+
+        down(code) {
+          this.hero.moveStart(code);
+        }
+
+        up(code) {
+          this.hero.moveStop(code);
+        }
+
+        update(ctx) {
+          this.sky.draw(ctx);
+          this.hero.update();
+
+          this.elements = this.elements.filter((e) => !e.isOut());
+
+          this.elements.forEach((e) => e.update());
+        }
+      }
+
+      const engine = new Engine(Scennes);
+
+      function keyMove(event) {
+        // console.log("keyMove: ", event.code);
+        engine.down(event.code);
+      }
+
+      function keyUp(event) {
+        // console.log("keyUp: ", event.code);
+        engine.up(event.code);
+      }
+
+      function run() {
+        engine.update(ctx);
+        window.requestAnimationFrame(run);
+      }
+
+      run();
+
+      document.addEventListener("keydown", keyMove);
+      document.addEventListener("keyup", keyUp);
+    </script>
+  </body>
+</html>
